@@ -171,49 +171,21 @@ class WillowSensorInteractor {
     return _ctrlTimesync(deviceId, time.millisecondsSinceEpoch ~/ 1000);
   }
 
-  Future<List<WillowSensorMeasurement>> _measRead(String deviceId) async {
-    List<int> measurementsList = [];
-    try {
-      measurementsList = await _ble
-          .readCharacteristic(WillowSensorCharacteristic.meas(deviceId));
-    } catch (e) {
-      debugPrint("exception reading value: $e");
-    }
-    final bytes = Uint8List.fromList(measurementsList);
-    const measSize = 13;
-    final numMeas = bytes.length ~/ measSize;
-    final List<WillowSensorMeasurement> measurements = [];
-    for (int i = 0; i < numMeas; i++) {
-      final measBytes =
-          ByteData.sublistView(bytes, i * measSize, (i + 1) * measSize);
-      final meas = WillowSensorMeasurement(
-        deviceId: deviceId,
-        timestamp: measBytes.getUint32(0, Endian.little),
-        illuminance: measBytes.getUint16(4, Endian.little),
-        temperature: measBytes.getInt16(6, Endian.little),
-        soilHumidity: measBytes.getUint8(8),
-        batteryLevel: measBytes.getUint8(9),
-        flags: measBytes.getUint8(10),
-      );
-      measurements.add(meas);
-    }
-    return measurements;
+  Future<List<int>> _measRead(String deviceId) async {
+    return await _ble
+        .readCharacteristic(WillowSensorCharacteristic.meas(deviceId));
   }
 
-  Future<List<WillowSensorMeasurement>> readMeasurements(
-      String deviceId, int lastTimestamp) async {
-    final List<WillowSensorMeasurement> measurements = [];
-
+  Future<List<int>> readMeasurements(String deviceId, int lastTimestamp) async {
+    final List<int> measurements = [];
     while (true) {
       await ctrlSeek(deviceId, lastTimestamp);
       var chunk = await _measRead(deviceId);
-
       if (chunk.isEmpty) {
         return measurements;
       }
-
       measurements.addAll(chunk);
-      lastTimestamp = measurements.last.timestamp;
+      lastTimestamp = getLatestTimeStamp(measurements);
     }
   }
 
@@ -255,4 +227,18 @@ class WillowSensorInteractor {
       );
     }
   }
+}
+
+int getLatestTimeStamp(List<int> measurements) {
+  final bytes = Uint8List.fromList(measurements);
+  const measSize = 13;
+  final numMeas = bytes.length ~/ measSize;
+  final List<int> timeStamps = [];
+  for (int i = 0; i < numMeas; i++) {
+    final measBytes =
+        ByteData.sublistView(bytes, i * measSize, (i + 1) * measSize);
+    final timeStamp = measBytes.getUint32(0, Endian.little);
+    timeStamps.add(timeStamp);
+  }
+  return timeStamps.last;
 }
