@@ -7,7 +7,13 @@ class WillowBleConnectionManager {
 
   /// connect to device
   /// scan should be stopped by  cancelling subscription
-  Stream<ConnectionStateUpdate> connectDevice(String deviceId) async* {
-    yield* _ble.connectToDevice(id: deviceId);
+  Stream<ConnectionStateUpdate> connectDevice(
+    String deviceId, {
+    Duration connectionTimeout = const Duration(seconds: 5),
+  }) async* {
+    yield* _ble.connectToDevice(
+      id: deviceId,
+      connectionTimeout: connectionTimeout,
+    );
   }
 }
